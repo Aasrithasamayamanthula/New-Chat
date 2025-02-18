@@ -27,6 +27,7 @@
                     <small class="error-message" id="password-error"></small>
                 </div>
                 <button type="submit" id="login-btn">Login</button>
+                <a href="#" id="forgot-password" class="forgot-password">Forgot Password?</a>
             </form>
             <p>Don't have an account? <span id="toggle-auth">Sign up</span></p>
         </div>
@@ -57,24 +58,30 @@
         <!-- Chat Area -->
         <div class="chat-area">
             <div class="chat-header">
+                <button class="back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
                 <div class="chat-user-info">
-                    <img id="chat-user-avatar" src="/api/placeholder/40/40" alt="Contact">
                     <div class="user-details">
                         <h3 id="chat-user-name">Select a chat</h3>
                         <span id="chat-user-status">offline</span>
                     </div>
                 </div>
                 <div class="chat-actions">
+                    <button id="voice-call" title="Voice Call">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button id="video-call" title="Video Call">
+                        <i class="fas fa-video"></i>
+                    </button>
                     <button id="clear-chat" title="Clear Chat">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
             </div>
-
             <div class="messages" id="messages">
                 <!-- Messages will be populated here -->
             </div>
-
             <div class="message-input">
                 <div class="input-actions">
                     <button id="emoji-btn"><i class="far fa-smile"></i></button>
@@ -121,11 +128,58 @@
         </div>
     </div>
 
+    <!-- Call Modal -->
+    <div id="call-modal" class="modal call-modal hidden">
+        <div class="call-interface">
+            <div class="call-header">
+                <div class="caller-info">
+                    <img src="/api/placeholder/80/80" alt="Caller" id="call-avatar">
+                    <h3 id="call-name">User Name</h3>
+                    <p id="call-status">Calling...</p>
+                </div>
+            </div>
+            <div class="video-container">
+                <video id="remote-video" autoplay playsinline></video>
+                <video id="local-video" autoplay playsinline muted></video>
+            </div>
+            <div class="call-controls">
+                <button id="toggle-mic" class="control-btn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="toggle-video" class="control-btn">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button id="end-call" class="control-btn decline">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="modal incoming-call-modal hidden">
+        <div class="incoming-call-interface">
+            <img src="/api/placeholder/80/80" alt="Caller" id="incoming-call-avatar">
+            <h3 id="incoming-call-name">User Name</h3>
+            <p id="incoming-call-type">Incoming video call...</p>
+            <div class="call-actions">
+                <button id="accept-call" class="control-btn accept">
+                    <i class="fas fa-phone"></i>
+                </button>
+                <button id="reject-call" class="control-btn decline">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-auth-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-firestore-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.8.0/firebase-storage-compat.min.js"></script>
     <script src="app.js"></script>
+    <script src="call.js"></script>
 </body>
 </html>
 

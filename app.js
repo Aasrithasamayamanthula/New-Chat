@@ -78,6 +78,26 @@ const profilePhotoContainer = document.querySelector('.profile-photo-container')
 // Add clear chat button
 const clearChatBtn = document.getElementById('clear-chat');
 
+// Add forgot password link
+const forgotPasswordLink = document.getElementById('forgot-password');
+
+// Add mobile navigation handling
+const sidebar = document.querySelector('.sidebar');
+const backBtn = document.querySelector('.back-btn');
+
+// Add mobile navigation handlers
+function showChat() {
+    if (window.innerWidth <= 768) {
+        sidebar.classList.add('hidden');
+    }
+}
+
+function showSidebar() {
+    if (window.innerWidth <= 768) {
+        sidebar.classList.remove('hidden');
+    }
+}
+
 // Auth State Change Listener
 auth.onAuthStateChanged((user) => {
     if (user) {
@@ -166,6 +186,49 @@ toggleAuth.addEventListener('click', () => {
     toggleAuth.textContent = isLogin ? 'Login' : 'Sign up';
 });
 
+// Add forgot password handler
+forgotPasswordLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value.trim();
+    
+    if (!email) {
+        alert('Please enter your email address first');
+        document.getElementById('email').focus();
+        return;
+    }
+    
+    try {
+        forgotPasswordLink.textContent = 'Sending...';
+        forgotPasswordLink.style.pointerEvents = 'none';
+        
+        await auth.sendPasswordResetEmail(email, {
+            url: window.location.href
+        });
+        
+        alert('Password reset email sent! Please check your inbox.');
+    } catch (error) {
+        console.error('Error sending reset email:', error);
+        let errorMessage = 'Failed to send reset email. ';
+        
+        switch (error.code) {
+            case 'auth/invalid-email':
+                errorMessage += 'Please enter a valid email address.';
+                break;
+            case 'auth/user-not-found':
+                errorMessage += 'No account found with this email.';
+                break;
+            default:
+                errorMessage += error.message;
+        }
+        
+        alert(errorMessage);
+    } finally {
+        forgotPasswordLink.textContent = 'Forgot Password?';
+        forgotPasswordLink.style.pointerEvents = 'auto';
+    }
+});
+
 // User Management
 async function setupUserProfile() {
     const userDoc = await db.collection('users').doc(currentUser.uid).get();
@@ -210,8 +273,25 @@ function startChat(userId, userData) {
             `${userId}_${currentUser.uid}`
         ])
         .orderBy('timestamp')
-        .onSnapshot(snapshot => {
+        .onSnapshot(async snapshot => {
             messages.innerHTML = '';
+            
+            // Mark received messages as read
+            const batch = db.batch();
+            let hasUnread = false;
+            
+            snapshot.forEach(doc => {
+                const message = doc.data();
+                if (message.receiverId === currentUser.uid && !message.read) {
+                    hasUnread = true;
+                    batch.update(doc.ref, { read: true });
+                }
+            });
+            
+            if (hasUnread) {
+                await batch.commit();
+            }
+            
             snapshot.forEach(doc => {
                 const message = doc.data();
                 const messageEl = document.createElement('div');
@@ -219,13 +299,24 @@ function startChat(userId, userData) {
                 messageEl.dataset.id = doc.id;
                 
                 const timestamp = formatTimestamp(message.timestamp);
-                const edited = message.edited ? ' (edited)' : '';
+                const edited = message.edited ? '<span class="edited-tag">(edited)</span>' : '';
                 
                 if (message.senderId === currentUser.uid) {
+                    const messageText = message.fileUrl ? getMessageContentByType(message) : message.text;
                     messageEl.innerHTML = `
                         <div class="message-content">
-                            ${message.fileUrl ? getMessageContentByType(message) : message.text}
-                            <div class="message-timestamp">${timestamp}${edited}</div>
+                            <div class="message-text">${messageText}</div>
+                            <div class="message-info">
+                                <div class="message-meta">
+                                    <span class="message-timestamp">${timestamp}</span>
+                                    ${edited}
+                                </div>
+                                <span class="message-status">
+                                    ${message.read ? 
+                                        '<i class="fas fa-check-double"></i>' : 
+                                        '<i class="fas fa-check"></i>'}
+                                </span>
+                            </div>
                         </div>
                         <button class="message-options-btn">
                             <i class="fas fa-ellipsis-v"></i>
@@ -235,7 +326,9 @@ function startChat(userId, userData) {
                     messageEl.innerHTML = `
                         <div class="message-content">
                             ${message.fileUrl ? getMessageContentByType(message) : message.text}
-                            <div class="message-timestamp">${timestamp}</div>
+                            <div class="message-info">
+                                <span class="message-timestamp">${timestamp}${edited}</span>
+                            </div>
                         </div>
                     `;
                 }
@@ -244,6 +337,8 @@ function startChat(userId, userData) {
             });
             messages.scrollTop = messages.scrollHeight;
         });
+
+    showChat();
 }
 
 // Helper function to get message content based on type
@@ -382,10 +477,14 @@ messages.addEventListener('click', async (e) => {
                 await navigator.clipboard.writeText(messageContent.textContent);
                 alert('Message copied to clipboard');
             } else if (button.classList.contains('edit-btn')) {
-                const text = messageContent.childNodes[0].textContent.trim();
+                const messageText = messageEl.querySelector('.message-text');
+                const text = messageText.textContent.trim();
                 const newText = prompt('Edit message:', text);
                 if (newText && newText.trim() && newText !== text) {
-                    await updateMessageInFirestore(messageId, newText.trim());
+                    const success = await updateMessageInFirestore(messageId, newText.trim());
+                    if (!success) {
+                        messageText.textContent = text; // Revert on failure
+                    }
                 }
             } else if (button.classList.contains('delete-btn')) {
                 if (confirm('Delete this message?')) {
@@ -397,13 +496,13 @@ messages.addEventListener('click', async (e) => {
             alert('Failed to perform action. Please try again.');
         }
 
-        messageActions.remove();
+        closeMessageMenu(messageActions);
     });
 
     // Close menu on click outside
     document.addEventListener('click', function closeMenu(e) {
         if (!messageActions.contains(e.target) && !optionsBtn.contains(e.target)) {
-            messageActions.remove();
+            closeMessageMenu(messageActions);
             document.removeEventListener('click', closeMenu);
         }
     });
@@ -411,33 +510,68 @@ messages.addEventListener('click', async (e) => {
 
 // Helper function to position menu
 function positionMessageMenu(messageEl, messageActions) {
-    const rect = messageEl.getBoundingClientRect();
-    const menuWidth = 150; // Approximate width of menu
-    const viewportWidth = window.innerWidth;
-    
-    // Default position (to the left of message)
-    let left = rect.left - menuWidth - 5;
-    
-    // If menu would go off screen to the left, position it to the right of message
-    if (left < 0) {
-        left = rect.right + 5;
-    }
-    
-    // If menu would go off screen to the right, position it to the left
-    if (left + menuWidth > viewportWidth) {
-        left = rect.left - menuWidth - 5;
-    }
-    
-    // If still doesn't fit, position under the message
-    if (left < 0) {
-        left = rect.left;
-        messageActions.style.top = `${rect.bottom + 5}px`;
+    if (window.innerWidth <= 768) {
+        messageActions.classList.add('show');
+        document.body.style.overflow = 'hidden';
     } else {
-        messageActions.style.top = `${rect.top}px`;
+        const rect = messageEl.getBoundingClientRect();
+        const menuWidth = 150; // Approximate width of menu
+        const viewportWidth = window.innerWidth;
+        
+        // Default position (to the left of message)
+        let left = rect.left - menuWidth - 5;
+        
+        // If menu would go off screen to the left, position it to the right of message
+        if (left < 0) {
+            left = rect.right + 5;
+        }
+        
+        // If menu would go off screen to the right, position it to the left
+        if (left + menuWidth > viewportWidth) {
+            left = rect.left - menuWidth - 5;
+        }
+        
+        // If still doesn't fit, position under the message
+        if (left < 0) {
+            left = rect.left;
+            messageActions.style.top = `${rect.bottom + 5}px`;
+        } else {
+            messageActions.style.top = `${rect.top}px`;
+        }
+        
+        messageActions.style.left = `${left}px`;
     }
-    
-    messageActions.style.left = `${left}px`;
 }
+
+// Update close menu handler
+function closeMessageMenu(messageActions) {
+    if (window.innerWidth <= 768) {
+        messageActions.classList.remove('show');
+        setTimeout(() => messageActions.remove(), 300);
+        document.body.style.overflow = '';
+    } else {
+        messageActions.remove();
+    }
+}
+
+// Add touch event handling for message actions
+let touchStartY = 0;
+document.addEventListener('touchstart', (e) => {
+    const messageActions = document.querySelector('.message-actions');
+    if (messageActions) {
+        touchStartY = e.touches[0].clientY;
+    }
+});
+
+document.addEventListener('touchmove', (e) => {
+    const messageActions = document.querySelector('.message-actions');
+    if (messageActions && messageActions.classList.contains('show')) {
+        const touchDiff = e.touches[0].clientY - touchStartY;
+        if (touchDiff > 50) {
+            closeMessageMenu(messageActions);
+        }
+    }
+});
 
 // File Upload
 const attachBtn = document.getElementById('attach-btn');
@@ -699,12 +833,19 @@ function formatTimestamp(timestamp) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function updateMessageInFirestore(messageId, newText) {
-    return db.collection('messages').doc(messageId).update({
-        text: newText,
-        edited: true,
-        editedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+async function updateMessageInFirestore(messageId, newText) {
+    try {
+        await db.collection('messages').doc(messageId).update({
+            text: newText,
+            edited: true,
+            editedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error updating message:', error);
+        alert('Failed to edit message. Please try again.');
+        return false;
+    }
 }
 
 function deleteMessageFromFirestore(messageId) {
@@ -736,5 +877,15 @@ clearChatBtn.addEventListener('click', async () => {
     } catch (error) {
         console.error('Error clearing chat:', error);
         alert('Failed to clear chat. Please try again.');
+    }
+});
+
+// Add back button handler
+backBtn.addEventListener('click', showSidebar);
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+        sidebar.classList.remove('hidden');
     }
 });
