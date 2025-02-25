@@ -9,6 +9,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+    <script>
+        const DEFAULT_AVATAR = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y";
+    </script>
 </head>
 <body class="light-theme">
     <!-- Auth Section -->
@@ -47,7 +50,14 @@
                 </div>
                 <div class="header-actions">
                     <button id="theme-toggle"><i class="fas fa-moon"></i></button>
+                    <button id="settings-btn"><i class="fas fa-cog"></i></button>
                     <button id="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
+            </div>
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="user-search" placeholder="Search contacts...">
                 </div>
             </div>
             <div class="user-list" id="user-list">
@@ -61,6 +71,7 @@
                 <button class="back-btn">
                     <i class="fas fa-arrow-left"></i>
                 </button>
+                <img id="chat-user-avatar" src="/api/placeholder/40/40" alt="User Avatar" class="chat-user-avatar">
                 <div class="chat-user-info">
                     <div class="user-details">
                         <h3 id="chat-user-name">Select a chat</h3>
@@ -169,6 +180,67 @@
                 <button id="reject-call" class="control-btn decline">
                     <i class="fas fa-phone-slash"></i>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Settings Modal before the closing body tag -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content settings-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button id="close-settings"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="settings-sections">
+                <section class="settings-section">
+                    <h4>Appearance</h4>
+                    <div class="setting-item">
+                        <label>Theme</label>
+                        <select id="theme-select">
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="system">System</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Chat Background</label>
+                        <input type="color" id="chat-bg-color" value="#ffffff">
+                    </div>
+                </section>
+                <section class="settings-section">
+                    <h4>Notifications</h4>
+                    <div class="setting-item">
+                        <label>Sound</label>
+                        <label class="switch">
+                            <input type="checkbox" id="notification-sound">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>Desktop Notifications</label>
+                        <label class="switch">
+                            <input type="checkbox" id="desktop-notifications">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </section>
+                <section class="settings-section">
+                    <h4>Privacy</h4>
+                    <div class="setting-item">
+                        <label>Read Receipts</label>
+                        <label class="switch">
+                            <input type="checkbox" id="read-receipts" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>Online Status</label>
+                        <label class="switch">
+                            <input type="checkbox" id="online-status" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </section>
             </div>
         </div>
     </div>

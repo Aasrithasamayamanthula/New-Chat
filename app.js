@@ -85,6 +85,21 @@ const forgotPasswordLink = document.getElementById('forgot-password');
 const sidebar = document.querySelector('.sidebar');
 const backBtn = document.querySelector('.back-btn');
 
+// Add after other DOM elements
+const searchInput = document.getElementById('user-search');
+let allUsers = []; // Store all users for filtering
+
+// Add after other DOM elements
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const closeSettings = document.getElementById('close-settings');
+const themeSelect = document.getElementById('theme-select');
+const chatBgColor = document.getElementById('chat-bg-color');
+const notificationSound = document.getElementById('notification-sound');
+const desktopNotifications = document.getElementById('desktop-notifications');
+const readReceipts = document.getElementById('read-receipts');
+const onlineStatus = document.getElementById('online-status');
+
 // Add mobile navigation handlers
 function showChat() {
     if (window.innerWidth <= 768) {
@@ -96,6 +111,33 @@ function showSidebar() {
     if (window.innerWidth <= 768) {
         sidebar.classList.remove('hidden');
     }
+}
+
+// Add this function to handle image loading errors
+function handleImageError(imgElement) {
+    imgElement.onerror = null;  // Prevent infinite loop
+    imgElement.src = DEFAULT_AVATAR;
+}
+
+// Modify image elements to use error handling
+document.getElementById('user-avatar').onerror = function() { handleImageError(this); };
+document.getElementById('chat-user-avatar').onerror = function() { handleImageError(this); };
+document.getElementById('profile-photo-preview').onerror = function() { handleImageError(this); };
+
+// When setting user profile image
+function updateUserAvatar(imageUrl) {
+    const avatarElements = [
+        document.getElementById('user-avatar'),
+        document.getElementById('chat-user-avatar'),
+        document.getElementById('profile-photo-preview')
+    ];
+    
+    avatarElements.forEach(element => {
+        if (element) {
+            element.src = imageUrl || DEFAULT_AVATAR;
+            element.onerror = function() { handleImageError(this); };
+        }
+    });
 }
 
 // Auth State Change Listener
@@ -237,35 +279,62 @@ async function setupUserProfile() {
     document.getElementById('user-avatar').src = userData.photoURL || '/api/placeholder/40/40';
 }
 
+// Modify the loadUsers function
 async function loadUsers() {
     const usersSnapshot = await db.collection('users').get();
+    allUsers = []; // Reset users array
     userList.innerHTML = '';
     
     usersSnapshot.forEach(doc => {
         if (doc.id !== currentUser.uid) {
             const userData = doc.data();
-            const userEl = document.createElement('div');
-            userEl.className = 'user-item';
-            userEl.innerHTML = `
-                <img src="${userData.photoURL || '/api/placeholder/50/50'}" alt="User">
-                <div class="user-info">
-                    <h4>${userData.displayName || userData.email}</h4>
-                    <span>${userData.online ? 'online' : 'offline'}</span>
-                </div>
-            `;
-            userEl.addEventListener('click', () => startChat(doc.id, userData));
-            userList.appendChild(userEl);
+            allUsers.push({
+                id: doc.id,
+                ...userData
+            });
+            createUserElement(doc.id, userData);
         }
     });
 }
 
-// Chat Functions
+// Add new function to create user element
+function createUserElement(userId, userData) {
+    const userEl = document.createElement('div');
+    userEl.className = 'user-item';
+    userEl.innerHTML = `
+        <img src="${userData.photoURL || DEFAULT_AVATAR}" alt="User" onerror="handleImageError(this)">
+        <div class="user-info">
+            <h4>${userData.displayName || userData.email}</h4>
+            <span>${userData.online ? 'online' : 'offline'}</span>
+        </div>
+    `;
+    userEl.addEventListener('click', () => startChat(userId, userData));
+    userList.appendChild(userEl);
+}
+
+// Add search functionality
+searchInput.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    userList.innerHTML = ''; // Clear current list
+
+    allUsers.forEach(user => {
+        const displayName = (user.displayName || user.email).toLowerCase();
+        if (displayName.includes(searchTerm)) {
+            createUserElement(user.id, user);
+        }
+    });
+});
+
+// Modify the startChat function
 function startChat(userId, userData) {
     if (messageListener) messageListener();
     currentChat = userId;
     
+    // Update chat header with user info including photo
     document.getElementById('chat-user-name').textContent = userData.displayName || userData.email;
     document.getElementById('chat-user-status').textContent = userData.online ? 'online' : 'offline';
+    document.getElementById('chat-user-avatar').src = userData.photoURL || DEFAULT_AVATAR;
+    document.getElementById('chat-user-avatar').onerror = function() { handleImageError(this); };
     
     messageListener = db.collection('messages')
         .where('chatId', 'in', [
@@ -479,13 +548,7 @@ messages.addEventListener('click', async (e) => {
             } else if (button.classList.contains('edit-btn')) {
                 const messageText = messageEl.querySelector('.message-text');
                 const text = messageText.textContent.trim();
-                const newText = prompt('Edit message:', text);
-                if (newText && newText.trim() && newText !== text) {
-                    const success = await updateMessageInFirestore(messageId, newText.trim());
-                    if (!success) {
-                        messageText.textContent = text; // Revert on failure
-                    }
-                }
+                enableInlineEditing(messageText, text, messageId);
             } else if (button.classList.contains('delete-btn')) {
                 if (confirm('Delete this message?')) {
                     await deleteMessageFromFirestore(messageId);
@@ -889,3 +952,158 @@ window.addEventListener('resize', () => {
         sidebar.classList.remove('hidden');
     }
 });
+
+// Add these new functions for inline editing
+function enableInlineEditing(messageTextEl, currentText, messageId) {
+    messageTextEl.classList.add('editing');
+    const originalContent = messageTextEl.innerHTML;
+    
+    messageTextEl.innerHTML = `
+        <input type="text" value="${currentText}" autofocus>
+        <div class="edit-actions">
+            <button class="save-edit" title="Save">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="cancel-edit" title="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+
+    const input = messageTextEl.querySelector('input');
+    const saveBtn = messageTextEl.querySelector('.save-edit');
+    const cancelBtn = messageTextEl.querySelector('.cancel-edit');
+
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+
+    // Handle save
+    saveBtn.addEventListener('click', async () => {
+        const newText = input.value.trim();
+        if (newText && newText !== currentText) {
+            const success = await updateMessageInFirestore(messageId, newText);
+            if (!success) {
+                messageTextEl.innerHTML = originalContent;
+            }
+        } else {
+            messageTextEl.innerHTML = originalContent;
+        }
+        messageTextEl.classList.remove('editing');
+    });
+
+    // Handle cancel
+    cancelBtn.addEventListener('click', () => {
+        messageTextEl.innerHTML = originalContent;
+        messageTextEl.classList.remove('editing');
+    });
+
+    // Handle Enter key to save
+    input.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveBtn.click();
+        }
+    });
+
+    // Handle Escape key to cancel
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            cancelBtn.click();
+        }
+    });
+}
+
+// Settings handlers
+settingsBtn.addEventListener('click', () => {
+    settingsModal.classList.remove('hidden');
+    loadSettings();
+});
+
+closeSettings.addEventListener('click', () => {
+    settingsModal.classList.add('hidden');
+});
+
+// Load settings from localStorage
+function loadSettings() {
+    const settings = JSON.parse(localStorage.getItem('chatSettings')) || {
+        theme: 'light',
+        chatBgColor: '#ffffff',
+        notificationSound: true,
+        desktopNotifications: true,
+        readReceipts: true,
+        onlineStatus: true
+    };
+
+    themeSelect.value = settings.theme;
+    chatBgColor.value = settings.chatBgColor;
+    notificationSound.checked = settings.notificationSound;
+    desktopNotifications.checked = settings.desktopNotifications;
+    readReceipts.checked = settings.readReceipts;
+    onlineStatus.checked = settings.onlineStatus;
+
+    applySettings(settings);
+}
+
+// Save settings
+function saveSettings() {
+    const settings = {
+        theme: themeSelect.value,
+        chatBgColor: chatBgColor.value,
+        notificationSound: notificationSound.checked,
+        desktopNotifications: desktopNotifications.checked,
+        readReceipts: readReceipts.checked,
+        onlineStatus: onlineStatus.checked
+    };
+
+    localStorage.setItem('chatSettings', JSON.stringify(settings));
+    applySettings(settings);
+}
+
+// Apply settings
+function applySettings(settings) {
+    // Apply theme
+    if (settings.theme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.body.classList.toggle('dark-theme', prefersDark);
+    } else {
+        document.body.classList.toggle('dark-theme', settings.theme === 'dark');
+    }
+
+    // Apply chat background color
+    document.querySelector('.messages').style.backgroundColor = settings.chatBgColor;
+
+    // Update online status in Firebase
+    if (currentUser) {
+        updateOnlineStatus(settings.onlineStatus);
+    }
+}
+
+// Add event listeners for settings changes
+[themeSelect, chatBgColor, notificationSound, desktopNotifications, readReceipts, onlineStatus]
+    .forEach(element => {
+        element.addEventListener('change', saveSettings);
+    });
+
+// Request notification permission
+if ('Notification' in window) {
+    desktopNotifications.addEventListener('change', async (e) => {
+        if (e.target.checked) {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                e.target.checked = false;
+                alert('Please allow notifications to enable this feature.');
+            }
+        }
+    });
+}
+
+// Modify the existing window.matchMedia listener
+window.matchMedia('(prefers-color-scheme: dark)').addListener(() => {
+    const settings = JSON.parse(localStorage.getItem('chatSettings')) || {};
+    if (settings.theme === 'system') {
+        loadSettings();
+    }
+});
+
+// Load settings on startup
+loadSettings();
