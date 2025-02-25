@@ -885,9 +885,52 @@ profilePhotoInput.addEventListener('change', (e) => {
 
 // Error handling
 window.onerror = function(message, source, lineno, colno, error) {
-    console.error('Global error:', error);
+    console.error('Global error:', {
+        message,
+        source,
+        lineno,
+        colno,
+        error,
+        stack: error?.stack
+    });
+
+    // Handle specific errors
+    if (error?.message?.includes("Cannot read properties of null")) {
+        console.log('User not authenticated or data not loaded yet');
+        return;
+    }
+
     // You can implement error reporting here
 };
+
+// Add these helper functions
+function safeGetUser() {
+    return new Promise((resolve) => {
+        const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+}
+
+async function ensureAuthenticated() {
+    const user = await safeGetUser();
+    if (!user) {
+        throw new Error('User not authenticated');
+    }
+    return user;
+}
+
+// Example usage in async functions
+async function someFunction() {
+    try {
+        const user = await ensureAuthenticated();
+        // Now you can safely use user.uid
+    } catch (error) {
+        console.error('Authentication error:', error);
+        // Handle the error appropriately
+    }
+}
 
 // Message handling functions
 function formatTimestamp(timestamp) {

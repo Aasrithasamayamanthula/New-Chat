@@ -4,6 +4,16 @@ class CallHandler {
         this.remoteStream = null;
         this.peerConnection = null;
         this.currentCall = null;
+        this.currentUser = null;
+        this.db = firebase.firestore();
+
+        // Initialize after Firebase Auth
+        firebase.auth().onAuthStateChanged(user => {
+            this.currentUser = user;
+            if (user) {
+                this.setupCallListener();
+            }
+        });
 
         // DOM Elements
         this.initializeDOMElements();
@@ -17,9 +27,6 @@ class CallHandler {
                 }
             ]
         };
-
-        // Listen for incoming calls
-        this.setupCallListener();
     }
 
     initializeDOMElements() {
@@ -276,18 +283,23 @@ class CallHandler {
     }
 
     setupCallListener() {
-        // Listen for incoming calls
-        db.collection('calls')
-            .where('receiver', '==', currentUser.uid)
-            .where('status', '==', 'calling')
-            .onSnapshot(snapshot => {
+        if (!this.currentUser) return; // Add safety check
+
+        try {
+            const callsRef = this.db.collection('calls')
+                .where('receiverId', '==', this.currentUser.uid);
+
+            callsRef.onSnapshot(snapshot => {
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'added') {
-                        const call = change.doc.data();
-                        this.handleIncomingCall(change.doc.id, call);
+                        const callData = change.doc.data();
+                        this.handleIncomingCall(callData);
                     }
                 });
             });
+        } catch (error) {
+            console.error('Error setting up call listener:', error);
+        }
 
         // Listen for call status changes
         db.collection('calls')
@@ -305,20 +317,22 @@ class CallHandler {
             });
     }
 
-    async handleIncomingCall(callId, call) {
+    async handleIncomingCall(callData) {
+        if (!this.currentUser) return; // Add safety check
+
         this.currentCall = {
-            id: callId,
-            ...call
+            id: callData.id,
+            ...callData
         };
 
         // Show incoming call modal
-        const caller = await db.collection('users').doc(call.caller).get();
+        const caller = await db.collection('users').doc(callData.caller).get();
         const callerData = caller.data();
         
         document.getElementById('incoming-call-name').textContent = callerData.displayName || callerData.email;
         document.getElementById('incoming-call-avatar').src = callerData.photoURL || '/api/placeholder/80/80';
         document.getElementById('incoming-call-type').textContent = 
-            `Incoming ${call.type} call...`;
+            `Incoming ${callData.type} call...`;
         
         this.incomingModal.classList.remove('hidden');
 
@@ -336,5 +350,12 @@ class CallHandler {
     }
 }
 
-// Initialize call handler
-const callHandler = new CallHandler();
+// Initialize call handler only after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait for Firebase to be initialized
+    if (typeof firebase !== 'undefined') {
+        window.callHandler = new CallHandler();
+    } else {
+        console.error('Firebase is not initialized');
+    }
+});

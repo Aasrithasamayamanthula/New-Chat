@@ -10,7 +10,7 @@
     <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     <script>
-        const DEFAULT_AVATAR = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y";
+        const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23e0e0e0'/%3E%3Cpath d='M20 21c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm0 4c5.3 0 16 2.7 16 8v4H4v-4c0-5.3 10.7-8 16-8z' fill='%23bdbdbd'/%3E%3C/svg%3E";
     </script>
 </head>
 <body class="light-theme">
@@ -18,7 +18,7 @@
     <div id="auth-container" class="auth-container">
         <div class="auth-box">
             <h2>Welcome to Chat</h2>
-            <form id="auth-form" novalidate>
+            <form id="auth-form" novalidate>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
                 <div class="form-group">
                     <input type="email" id="email" placeholder="Email" required 
                         pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$">
@@ -42,7 +42,7 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <div class="user-profile">
-                    <img id="user-avatar" src="/api/placeholder/40/40" alt="Profile">
+                    <img id="user-avatar" src="" alt="Profile" onerror="this.src=DEFAULT_AVATAR">
                     <div class="user-info">
                         <h3 id="user-name">Loading...</h3>
                         <span class="online-status">online</span>
@@ -57,7 +57,7 @@
             <div class="search-container">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="user-search" placeholder="Search contacts...">
+                    <input type="text" id="user-search" placeholder="Search accounts...">
                 </div>
             </div>
             <div class="user-list" id="user-list">
@@ -71,7 +71,7 @@
                 <button class="back-btn">
                     <i class="fas fa-arrow-left"></i>
                 </button>
-                <img id="chat-user-avatar" src="/api/placeholder/40/40" alt="User Avatar" class="chat-user-avatar">
+                <img id="chat-user-avatar" src="" alt="User Avatar" class="chat-user-avatar" onerror="this.src=DEFAULT_AVATAR">
                 <div class="chat-user-info">
                     <div class="user-details">
                         <h3 id="chat-user-name">Select a chat</h3>
@@ -114,7 +114,7 @@
             <form id="profile-form">
                 <div class="form-group profile-photo-group">
                     <div class="profile-photo-container">
-                        <img id="profile-photo-preview" src="/api/placeholder/100/100" alt="Profile Photo">
+                        <img id="profile-photo-preview" src="" alt="Profile Photo" onerror="this.src=DEFAULT_AVATAR">
                         <div class="photo-overlay">
                             <i class="fas fa-camera"></i>
                             <span>Change Photo</span>
@@ -134,7 +134,7 @@
                     <label for="profile-password">New Password (optional)</label>
                     <input type="password" id="profile-password" minlength="6">
                 </div>
-                <button type="submit">Save Changes</button>
+                <button type="submit">Done</button>
             </form>
         </div>
     </div>
@@ -144,7 +144,7 @@
         <div class="call-interface">
             <div class="call-header">
                 <div class="caller-info">
-                    <img src="/api/placeholder/80/80" alt="Caller" id="call-avatar">
+                    <img src="" alt="Caller" id="call-avatar" onerror="this.src=DEFAULT_AVATAR">
                     <h3 id="call-name">User Name</h3>
                     <p id="call-status">Calling...</p>
                 </div>
@@ -170,7 +170,7 @@
     <!-- Incoming Call Modal -->
     <div id="incoming-call-modal" class="modal incoming-call-modal hidden">
         <div class="incoming-call-interface">
-            <img src="/api/placeholder/80/80" alt="Caller" id="incoming-call-avatar">
+            <img src="" alt="Caller" id="incoming-call-avatar" onerror="this.src=DEFAULT_AVATAR">
             <h3 id="incoming-call-name">User Name</h3>
             <p id="incoming-call-type">Incoming video call...</p>
             <div class="call-actions">
